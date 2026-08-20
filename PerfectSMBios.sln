@@ -5,6 +5,8 @@ VisualStudioVersion = 17.13.35818.85 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PerfectSMBios", "PerfectSMBios\PerfectSMBios.vcxproj", "{D0AFAC55-2E74-4162-8D88-542C74752547}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PerfectSMBiosDrv", "PerfectSMBiosDrv\PerfectSMBiosDrv.vcxproj", "{7B4A2C0F-3E8F-4C9E-A8D5-6F1B2D5E4A31}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Release|x64 = Release|x64
@@ -12,6 +14,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D0AFAC55-2E74-4162-8D88-542C74752547}.Release|x64.ActiveCfg = Release|x64
 		{D0AFAC55-2E74-4162-8D88-542C74752547}.Release|x64.Build.0 = Release|x64
+		{7B4A2C0F-3E8F-4C9E-A8D5-6F1B2D5E4A31}.Release|x64.ActiveCfg = Release|x64
+		{7B4A2C0F-3E8F-4C9E-A8D5-6F1B2D5E4A31}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

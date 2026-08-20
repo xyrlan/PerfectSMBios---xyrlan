@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{7B4A2C0F-3E8F-4C9E-A8D5-6F1B2D5E4A31}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <!-- VisualUefi ( https://github.com/ionescu007/VisualUefi ) provides the
+       UEFI props / static libs. Point VISUALUEFI_ROOT at your clone. -->
+  <Import Project="$(VISUALUEFI_ROOT)\samples\samples.default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(VISUALUEFI_ROOT)\samples\samples.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- samples.props resolves EDK / lib / forced-include paths relative to
+       $(SolutionDir), which only works when the .sln lives at
+       $(VISUALUEFI_ROOT)\samples\. Re-anchor them here. -->
+  <PropertyGroup>
+    <EDK_PATH>$(VISUALUEFI_ROOT)\edk2</EDK_PATH>
+    <IncludePath>$(EDK_PATH)\MdePkg\Include;$(EDK_PATH)\MdePkg\Include\X64;$(EDK_PATH)\ShellPkg\Include;$(EDK_PATH)\CryptoPkg\Include</IncludePath>
+    <LibraryPath>$(VISUALUEFI_ROOT)\EDK-II\$(Platform)\$(Configuration)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ForcedIncludeFiles>$(VISUALUEFI_ROOT)\EDK-II\BaseLib\vshacks.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <!-- Driver entry-point library (not application). Everything else
+           (SubSystem = EFI Boot Service Driver, /Driver, /EntryPoint EfiMain)
+           is inherited from samples.props defaults. -->
+      <AdditionalDependencies>UefiDriverEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="driver.c" />
+    <!-- Reuse the same helper library the App uses. -->
+    <ClCompile Include="..\PerfectSMBios\PerfectSMBios\PerfectSMBios.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\PerfectSMBios\PerfectSMBios\PerfectSMBios.h" />
+  </ItemGroup>
+</Project>
