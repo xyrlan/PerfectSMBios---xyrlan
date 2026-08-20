@@ -11,11 +11,25 @@
     <ProjectGuid>{D0AFAC55-2E74-4162-8D88-542C74752547}</ProjectGuid>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <Import Project="C:\Program Files\MSVC_UEFI\UEFI.default.props" />
+  <!-- VisualUefi ( https://github.com/ionescu007/VisualUefi ) provides the
+       UEFI props / static libs. Point VISUALUEFI_ROOT at your clone. -->
+  <Import Project="$(VISUALUEFI_ROOT)\samples\samples.default.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <Import Project="C:\Program Files\MSVC_UEFI\UEFI.props" />
+  <Import Project="$(VISUALUEFI_ROOT)\samples\samples.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- samples.props resolves EDK / lib / forced-include paths relative to
+       $(SolutionDir), which only works when the .sln lives at
+       $(VISUALUEFI_ROOT)\samples\. Because our .sln lives elsewhere, we
+       re-anchor those paths on $(VISUALUEFI_ROOT) explicitly. -->
+  <PropertyGroup>
+    <EDK_PATH>$(VISUALUEFI_ROOT)\edk2</EDK_PATH>
+    <IncludePath>$(EDK_PATH)\MdePkg\Include;$(EDK_PATH)\MdePkg\Include\X64;$(EDK_PATH)\ShellPkg\Include;$(EDK_PATH)\CryptoPkg\Include</IncludePath>
+    <LibraryPath>$(VISUALUEFI_ROOT)\EDK-II\$(Platform)\$(Configuration)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup>
+    <ClCompile>
+      <ForcedIncludeFiles>$(VISUALUEFI_ROOT)\EDK-II\BaseLib\vshacks.h</ForcedIncludeFiles>
+    </ClCompile>
     <Link>
       <AdditionalDependencies>UefiApplicationEntryPoint.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>EFI Application</SubSystem>
