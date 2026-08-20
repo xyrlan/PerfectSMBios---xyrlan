@@ -62,6 +62,16 @@ void* __fastcall PSMB_GetTargetTable( PSMB_TableEnum table_type, void* table_add
 CHAR8* __fastcall PSMB_GetSMBiosString( SMBIOS_STRUCTURE* Hdr, UINT8 str_idx );
 
 
+/* End of a struct's string pool.
+   Returns a pointer to the first NUL of the terminating "\0\0" of Hdr's
+   string pool, or NULL when the pool is malformed (no double-NUL found
+   before table_end). Callers use this to bound-check any string pointer
+   returned by PSMB_GetSMBiosString: SMBIOS is walked by index and a
+   corrupt / mis-numbered index would otherwise let a caller step into
+   the next struct's header. */
+CHAR8* __fastcall PSMB_GetStringPoolEnd( SMBIOS_STRUCTURE* Hdr, void* table_end );
+
+
 /* Generating a random number within bounds */
 UINTN PSMB_GenRandNumber( UINTN min, UINTN max );
 

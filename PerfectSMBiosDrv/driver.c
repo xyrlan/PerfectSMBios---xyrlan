@@ -70,17 +70,32 @@ EFI_STATUS EFIAPI UefiUnload( IN EFI_HANDLE ImageHandle )
 
 //
 // Same string-field spoof helper the App version uses, minus the pretty
-// before/after prints. Returns silently on any missing / empty field so a
-// single missing string doesn't take the driver down mid-boot.
+// before/after prints. Returns silently on any missing / empty / OOB field so
+// a single bad string doesn't take the driver down mid-boot.
 //
-static void SpoofStringField( SMBIOS_STRUCTURE* hdr, UINT8 str_idx )
+// The `pool_end` argument is the "\0\0" terminator of this struct's string
+// pool ( from PSMB_GetStringPoolEnd ). Without that bound, a firmware that
+// declares e.g. SKUNumber = 5 while only publishing 4 strings would make
+// PSMB_GetSMBiosString return a pointer INTO THE NEXT STRUCT'S HEADER, and
+// the CopyMem below would scribble random ASCII across it -- breaking the
+// whole table walker for the OS. That's the bug the v1 driver hit.
+//
+static void SpoofStringField( SMBIOS_STRUCTURE* hdr, UINT8 str_idx, CHAR8* pool_end )
 {
-    if ( !hdr || str_idx == 0 ) return;
+    if ( !hdr || str_idx == 0 || !pool_end ) return;
 
     CHAR8* ascii = PSMB_GetSMBiosString( hdr, str_idx );
     if ( !ascii || *ascii == '\0' ) return;
 
-    UINTN  len  = AsciiStrLen( ascii );
+    /* Reject a pointer outside our string pool ( bad index in Hdr ). */
+    CHAR8* pool_start = ( CHAR8* )hdr + hdr->Length;
+    if ( ascii < pool_start || ascii >= pool_end ) return;
+
+    UINTN len = AsciiStrLen( ascii );
+
+    /* Refuse if the string somehow crosses the terminator ( malformed ). */
+    if ( ascii + len > pool_end ) return;
+
     CHAR8* rand = PSMB_GenRandASCIIString( len );
     if ( !rand ) return;
 
@@ -135,11 +150,20 @@ EFI_STATUS EFIAPI UefiMain( IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syst
         return EFI_SUCCESS;
     }
 
-    /* Strings (always safe: SpoofStringField no-ops on idx=0 / empty). */
-    SpoofStringField( &sys_info->Hdr, sys_info->Manufacturer );
-    SpoofStringField( &sys_info->Hdr, sys_info->ProductName  );
-    SpoofStringField( &sys_info->Hdr, sys_info->Version      );
-    SpoofStringField( &sys_info->Hdr, sys_info->SerialNumber );
+    /* Bound for the string pool of THIS struct, so SpoofStringField cannot
+       stray into Type 2 and corrupt the walker. */
+    CHAR8* pool_end = PSMB_GetStringPoolEnd( &sys_info->Hdr, ( CHAR8* )table_base + table_len );
+    if ( !pool_end )
+    {
+        PSMB_LOG( L"[PSMB-DRV] Type 1 string pool malformed, skipping\n" );
+        return EFI_SUCCESS;
+    }
+
+    /* Strings (always safe: SpoofStringField no-ops on idx=0 / OOB / empty). */
+    SpoofStringField( &sys_info->Hdr, sys_info->Manufacturer, pool_end );
+    SpoofStringField( &sys_info->Hdr, sys_info->ProductName,  pool_end );
+    SpoofStringField( &sys_info->Hdr, sys_info->Version,      pool_end );
+    SpoofStringField( &sys_info->Hdr, sys_info->SerialNumber, pool_end );
 
     /* UUID needs SMBIOS 2.1+ (Hdr.Length must cover the field). */
     if ( sys_info->Hdr.Length >= ( OFFSET_OF( SMBIOS_TABLE_TYPE1, Uuid ) + sizeof( sys_info->Uuid ) ) )
@@ -150,8 +174,8 @@ EFI_STATUS EFIAPI UefiMain( IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Syst
     /* SKUNumber / Family need SMBIOS 2.4+. */
     if ( sys_info->Hdr.Length >= 0x1B )
     {
-        SpoofStringField( &sys_info->Hdr, sys_info->SKUNumber );
-        SpoofStringField( &sys_info->Hdr, sys_info->Family    );
+        SpoofStringField( &sys_info->Hdr, sys_info->SKUNumber, pool_end );
+        SpoofStringField( &sys_info->Hdr, sys_info->Family,    pool_end );
     }
 
     PSMB_LOG( L"[PSMB-DRV] Type 1 spoofed\n" );

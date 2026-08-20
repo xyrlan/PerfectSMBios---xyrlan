@@ -130,6 +130,27 @@ CHAR8* __fastcall PSMB_GetSMBiosString( SMBIOS_STRUCTURE* Hdr, UINT8 str_idx )
 }
 
 
+/* End of a struct's string pool ( see header for rationale ) */
+CHAR8* __fastcall PSMB_GetStringPoolEnd( SMBIOS_STRUCTURE* Hdr, void* table_end )
+{
+	if ( !Hdr || !table_end ) return NULL;
+
+	CHAR8* p     = ( CHAR8* )Hdr + Hdr->Length;
+	CHAR8* limit = ( CHAR8* )table_end;
+
+	/* Walk to the "\0\0" terminator. Need room for the two-byte look-ahead. */
+	while ( p + 1 < limit )
+	{
+		if ( p[ 0 ] == 0 && p[ 1 ] == 0 ) return p;
+		p++;
+	}
+
+	/* No terminator inside the table  ->  the struct is malformed (or the
+	   walker was fed the wrong Hdr). Refuse rather than guess a length. */
+	return NULL;
+}
+
+
 /* Generating a random number within bounds */
 UINTN PSMB_GenRandNumber( UINTN min, UINTN max )
 {

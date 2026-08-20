@@ -59,17 +59,23 @@ static void PrintSmbiosString( CONST CHAR16* label, CHAR8* ascii )
  * Overwrites in-place with a same-length random ASCII string so the table
  * layout (double-NUL terminator, following structures) is preserved.
  *
+ * `pool_end` bounds the write so a mis-numbered index in `hdr` can't send
+ * PSMB_GetSMBiosString into the next struct's header ( see the driver's
+ * SpoofStringField comment for the failure mode ).
+ *
  * Silently skips when:
  *   - str_idx == 0                    (SMBIOS "unused" convention)
+ *   - the resolved string is out of  (bad index in header)
+ *     bounds of this struct's pool
  *   - the resolved string is empty    (nothing to overwrite)
  *   - alloc fails                     (leaves original intact)
  *
  * Also frees the buffer returned by PSMB_GenRandASCIIString, which the
  * original main.c leaked.
  */
-static void SpoofStringField( SMBIOS_STRUCTURE* hdr, UINT8 str_idx, CONST CHAR16* label )
+static void SpoofStringField( SMBIOS_STRUCTURE* hdr, UINT8 str_idx, CHAR8* pool_end, CONST CHAR16* label )
 {
-    if ( !hdr || str_idx == 0 )
+    if ( !hdr || str_idx == 0 || !pool_end )
     {
         Print( L"(-) %s: field not present (idx=0)\n", label );
         return;
@@ -82,7 +88,23 @@ static void SpoofStringField( SMBIOS_STRUCTURE* hdr, UINT8 str_idx, CONST CHAR16
         return;
     }
 
-    UINTN  len  = AsciiStrLen( ascii );
+    /* Reject a pointer outside our string pool ( bad index in Hdr ). */
+    CHAR8* pool_start = ( CHAR8* )hdr + hdr->Length;
+    if ( ascii < pool_start || ascii >= pool_end )
+    {
+        Print( L"(-) %s: string idx %u points outside pool, skipping\n", label, str_idx );
+        return;
+    }
+
+    UINTN len = AsciiStrLen( ascii );
+
+    /* Refuse if the string would cross the terminator ( malformed ). */
+    if ( ascii + len > pool_end )
+    {
+        Print( L"(-) %s: string crosses pool end, skipping\n", label );
+        return;
+    }
+
     CHAR8* rand = PSMB_GenRandASCIIString( len );
     if ( !rand )
     {
@@ -199,10 +221,19 @@ EFI_STATUS EFIAPI UefiMain ( IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Sys
     //   0x19 SKUNumber      (BYTE, string index)  — SMBIOS 2.4+  (Hdr.Length >= 0x1B)
     //   0x1A Family         (BYTE, string index)  — SMBIOS 2.4+  (Hdr.Length >= 0x1B)
     //
-    SpoofStringField( &sys_info->Hdr, sys_info->Manufacturer, L"Manufacturer" );
-    SpoofStringField( &sys_info->Hdr, sys_info->ProductName,  L"ProductName"  );
-    SpoofStringField( &sys_info->Hdr, sys_info->Version,      L"Version"      );
-    SpoofStringField( &sys_info->Hdr, sys_info->SerialNumber, L"SerialNumber" );
+    /* Bound writes to Type 1's string pool: a wrong index in Hdr must not
+       let us walk into the next struct. */
+    CHAR8* pool_end = PSMB_GetStringPoolEnd( &sys_info->Hdr, ( CHAR8* )table_base + table_len );
+    if ( !pool_end )
+    {
+        Print( L"(!) Type 1 string pool malformed, aborting\n" );
+        return EFI_LOAD_ERROR;
+    }
+
+    SpoofStringField( &sys_info->Hdr, sys_info->Manufacturer, pool_end, L"Manufacturer" );
+    SpoofStringField( &sys_info->Hdr, sys_info->ProductName,  pool_end, L"ProductName"  );
+    SpoofStringField( &sys_info->Hdr, sys_info->Version,      pool_end, L"Version"      );
+    SpoofStringField( &sys_info->Hdr, sys_info->SerialNumber, pool_end, L"SerialNumber" );
 
     /* UUID lives inside the fixed area of the struct, not in the string pool.
        Only present when the struct is long enough (SMBIOS >= 2.1).           */
@@ -221,8 +252,8 @@ EFI_STATUS EFIAPI UefiMain ( IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE* Sys
     /* SKUNumber / Family only exist on SMBIOS 2.4+ structs. */
     if ( sys_info->Hdr.Length >= 0x1B )
     {
-        SpoofStringField( &sys_info->Hdr, sys_info->SKUNumber, L"SKUNumber" );
-        SpoofStringField( &sys_info->Hdr, sys_info->Family,    L"Family"    );
+        SpoofStringField( &sys_info->Hdr, sys_info->SKUNumber, pool_end, L"SKUNumber" );
+        SpoofStringField( &sys_info->Hdr, sys_info->Family,    pool_end, L"Family"    );
     }
     else
     {
